@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>NatureLens: Local Bio-Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root{--forest:#1a3a2a;--moss:#2d6a4f;--leaf:#52b788;--lime:#95d5b2;--cream:#f5f2ea;--bark:#8b5e3c;--danger:#e63946;--warn:#f4a261;--card:rgba(255,255,255,0.96);--shadow:0 4px 20px rgba(26,58,42,0.12);--shadow-lg:0 8px 40px rgba(26,58,42,0.18);}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:'DM Sans',sans-serif;background:var(--forest);color:var(--forest);}
+.screen{display:none;flex-direction:column;height:100vh;position:relative;overflow:hidden;}
+.screen.active{display:flex;}
+
+/* SPLASH */
+#splash{background:linear-gradient(160deg,#0d2118 0%,#1a3a2a 40%,#2d6a4f 80%,#52b788 100%);align-items:center;justify-content:center;}
+.splash-bg{position:absolute;inset:0;overflow:hidden;pointer-events:none;}
+.splash-bg span{position:absolute;font-size:2rem;opacity:0.08;animation:drift 8s infinite ease-in-out;}
+.splash-bg span:nth-child(1){top:10%;left:5%;animation-delay:0s;}
+.splash-bg span:nth-child(2){top:20%;right:8%;animation-delay:1.5s;font-size:1.4rem;}
+.splash-bg span:nth-child(3){top:60%;left:3%;animation-delay:3s;font-size:1.8rem;}
+.splash-bg span:nth-child(4){bottom:15%;right:5%;animation-delay:2s;font-size:2.4rem;}
+.splash-bg span:nth-child(5){top:40%;right:15%;animation-delay:4s;}
+.splash-bg span:nth-child(6){bottom:30%;left:12%;animation-delay:1s;font-size:1.6rem;}
+@keyframes drift{0%,100%{transform:translateY(0) rotate(0deg);}50%{transform:translateY(-20px) rotate(10deg);}}
+.splash-inner{display:flex;flex-direction:column;align-items:center;z-index:1;padding:30px 24px;text-align:center;}
+.splash-lens{font-size:90px;animation:floatLens 3s ease-in-out infinite;margin-bottom:16px;filter:drop-shadow(0 8px 20px rgba(82,183,136,0.4));}
+@keyframes floatLens{0%,100%{transform:translateY(0) scale(1);}50%{transform:translateY(-12px) scale(1.04);}}
+.splash-title{font-family:'Playfair Display',serif;font-size:3rem;color:var(--cream);line-height:1;}
+.splash-tagline{color:var(--lime);font-size:0.78rem;letter-spacing:0.22em;text-transform:uppercase;margin:10px 0 36px;font-weight:500;}
+.splash-desc{color:rgba(255,255,255,0.6);font-size:0.88rem;max-width:280px;line-height:1.6;margin-bottom:32px;}
+.btn-start{background:linear-gradient(135deg,var(--leaf),var(--moss));color:#fff;border:none;border-radius:50px;padding:16px 44px;font-size:1rem;font-family:'DM Sans',sans-serif;font-weight:600;cursor:pointer;box-shadow:0 8px 30px rgba(82,183,136,0.45);transition:transform 0.2s;letter-spacing:0.04em;}
+.btn-start:active{transform:scale(0.96);}
+.splash-sdg{position:absolute;bottom:24px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:20px;padding:7px 20px;color:var(--lime);font-size:0.72rem;letter-spacing:0.1em;}
+
+/* TOPBAR */
+.topbar{background:linear-gradient(90deg,var(--forest),var(--moss));padding:12px 16px;display:flex;align-items:center;gap:10px;box-shadow:0 2px 12px rgba(0,0,0,0.25);flex-shrink:0;min-height:54px;}
+.topbar-back{background:rgba(255,255,255,0.1);border:none;width:34px;height:34px;border-radius:50%;color:#fff;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.2s;flex-shrink:0;}
+.topbar-back:active{background:rgba(255,255,255,0.25);}
+.topbar-title{font-family:'Playfair Display',serif;color:var(--cream);font-size:1.2rem;flex:1;}
+.topbar-right{color:var(--lime);font-size:0.78rem;white-space:nowrap;background:none;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;}
+
+/* NAV */
+.nav-bar{background:var(--forest);border-top:1px solid rgba(82,183,136,0.2);display:flex;flex-shrink:0;box-shadow:0 -4px 20px rgba(0,0,0,0.3);}
+.nav-btn{flex:1;background:none;border:none;padding:9px 4px 7px;display:flex;flex-direction:column;align-items:center;gap:3px;color:rgba(149,213,178,0.5);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.64rem;letter-spacing:0.03em;transition:color 0.2s;position:relative;}
+.nav-btn.active{color:var(--leaf);}
+.nav-btn.active::after{content:'';position:absolute;top:0;left:25%;right:25%;height:2px;background:var(--leaf);border-radius:0 0 3px 3px;}
+.nav-btn .icon{font-size:1.25rem;}
+
+/* SCROLL */
+.scroll-content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.scroll-content::-webkit-scrollbar{width:3px;}
+.scroll-content::-webkit-scrollbar-thumb{background:rgba(82,183,136,0.25);border-radius:2px;}
+
+/* HOME */
+#home .scroll-content{background:var(--cream);padding:16px;}
+.home-hero{background:linear-gradient(135deg,var(--moss) 0%,var(--forest) 100%);border-radius:22px;padding:22px 20px;margin-bottom:16px;position:relative;overflow:hidden;box-shadow:var(--shadow-lg);}
+.home-hero::before{content:'🌿';position:absolute;right:-14px;bottom:-14px;font-size:88px;opacity:0.12;transform:rotate(25deg);}
+.home-hero h2{font-family:'Playfair Display',serif;color:var(--cream);font-size:1.45rem;margin-bottom:6px;}
+.home-hero p{color:var(--lime);font-size:0.83rem;line-height:1.55;max-width:240px;}
+.location-pill{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,0.1);border-radius:20px;padding:4px 12px;font-size:0.72rem;color:rgba(255,255,255,0.75);margin-top:10px;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;}
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px;}
+.stat-card{background:var(--card);border-radius:16px;padding:14px 8px;text-align:center;box-shadow:var(--shadow);border:1px solid rgba(82,183,136,0.1);}
+.stat-num{font-family:'Playfair Display',serif;font-size:1.8rem;color:var(--moss);line-height:1;}
+.stat-lbl{font-size:0.66rem;color:#999;margin-top:3px;text-transform:uppercase;letter-spacing:0.06em;}
+.section-title{font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--forest);margin-bottom:11px;padding-left:2px;}
+.quick-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;}
+.action-card{background:var(--card);border-radius:18px;padding:16px 14px;cursor:pointer;box-shadow:var(--shadow);border:1px solid rgba(82,183,136,0.1);transition:transform 0.15s;display:flex;flex-direction:column;align-items:flex-start;gap:7px;}
+.action-card:active{transform:scale(0.96);}
+.action-card .ac-icon{font-size:1.7rem;}
+.action-card .ac-title{font-weight:600;font-size:0.88rem;color:var(--forest);}
+.action-card .ac-sub{font-size:0.72rem;color:#999;line-height:1.35;}
+.recent-item{background:var(--card);border-radius:14px;padding:12px 14px;display:flex;gap:12px;align-items:center;box-shadow:var(--shadow);border:1px solid rgba(82,183,136,0.08);cursor:pointer;transition:transform 0.15s;margin-bottom:10px;}
+.recent-item:active{transform:scale(0.98);}
+.ri-emoji{font-size:2rem;width:44px;height:44px;background:rgba(82,183,136,0.1);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.ri-info{flex:1;min-width:0;}
+.ri-name{font-weight:600;font-size:0.88rem;color:var(--forest);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ri-loc{font-size:0.73rem;color:#888;margin-top:2px;}
+.ri-time{font-size:0.68rem;color:#bbb;margin-top:2px;}
+
+/* TAGS */
+.tag{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:0.68rem;font-weight:600;white-space:nowrap;}
+.tag.native{background:rgba(82,183,136,0.15);color:#1e7d4a;}
+.tag.invasive{background:rgba(230,57,70,0.12);color:var(--danger);}
+.tag.endangered{background:rgba(244,162,97,0.18);color:#b85a00;}
+.tag.common{background:rgba(174,217,224,0.25);color:#1a6e7a;}
+.tag.unknown{background:rgba(0,0,0,0.06);color:#888;}
+.tag.other{background:rgba(0,0,0,0.06);color:#888;}
+
+/* UPLOAD */
+#upload .scroll-content{background:var(--cream);}
+.upload-zone{background:var(--card);border:2px dashed var(--leaf);border-radius:20px;padding:28px 20px;text-align:center;cursor:pointer;transition:all 0.2s;margin-bottom:14px;}
+.upload-zone.has-image{border-style:solid;border-color:var(--moss);}
+.upload-zone:active{background:rgba(82,183,136,0.06);}
+.uz-icon{font-size:2.6rem;margin-bottom:8px;}
+.uz-title{font-weight:600;color:var(--moss);font-size:0.95rem;}
+.uz-sub{color:#aaa;font-size:0.78rem;margin-top:4px;}
+#preview-img{width:100%;border-radius:16px;display:none;margin-bottom:14px;max-height:230px;object-fit:cover;box-shadow:var(--shadow-lg);}
+#file-input{display:none;}
+.form-group{margin-bottom:13px;}
+.form-label{font-size:0.8rem;font-weight:600;color:var(--forest);margin-bottom:5px;display:block;}
+.form-input,.form-select,.form-textarea{width:100%;background:var(--card);border:1.5px solid rgba(45,106,79,0.18);border-radius:12px;padding:11px 14px;font-family:'DM Sans',sans-serif;font-size:0.9rem;color:var(--forest);outline:none;transition:border-color 0.2s;-webkit-appearance:none;}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--leaf);}
+.form-textarea{resize:none;height:76px;line-height:1.5;}
+.form-select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%232d6a4f' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;}
+.ai-card{border-radius:18px;padding:16px;display:none;margin-bottom:14px;background:linear-gradient(135deg,var(--moss),var(--forest));box-shadow:var(--shadow-lg);}
+.ar-header{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.ar-emoji-box{font-size:2.4rem;background:rgba(255,255,255,0.12);width:52px;height:52px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.ar-name{font-family:'Playfair Display',serif;color:var(--cream);font-size:1.15rem;}
+.ar-sci{font-style:italic;color:var(--lime);font-size:0.78rem;margin-top:2px;}
+.ar-conf-row{display:flex;align-items:center;gap:6px;margin-top:8px;}
+.conf-bar-wrap{flex:1;height:6px;background:rgba(255,255,255,0.15);border-radius:3px;overflow:hidden;}
+.conf-bar{height:100%;background:var(--lime);border-radius:3px;transition:width 0.8s ease;}
+.conf-pct{color:var(--lime);font-size:0.78rem;font-weight:600;flex-shrink:0;}
+.ar-desc{color:rgba(255,255,255,0.8);font-size:0.8rem;line-height:1.55;margin-top:8px;}
+.ar-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+.ai-warning{background:rgba(230,57,70,0.15);border:1px solid rgba(230,57,70,0.3);border-radius:10px;padding:10px 14px;margin-top:8px;color:#ffb3b8;font-size:0.8rem;font-weight:500;display:none;}
+.spinner-wrap{display:none;flex-direction:column;align-items:center;justify-content:center;padding:22px;gap:10px;}
+.spinner{width:38px;height:38px;border:3px solid rgba(82,183,136,0.2);border-top-color:var(--leaf);border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.spinner-label{color:var(--moss);font-size:0.82rem;font-weight:500;}
+.btn-primary{background:linear-gradient(135deg,var(--leaf),var(--moss));color:#fff;border:none;border-radius:50px;padding:14px 32px;font-size:0.95rem;font-family:'DM Sans',sans-serif;font-weight:600;cursor:pointer;box-shadow:0 6px 24px rgba(82,183,136,0.35);transition:transform 0.15s;letter-spacing:0.03em;width:100%;}
+.btn-primary:active{transform:scale(0.97);}
+.btn-secondary{background:transparent;color:var(--moss);border:1.5px solid var(--leaf);border-radius:50px;padding:12px 24px;font-size:0.9rem;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;width:100%;transition:all 0.15s;margin-top:8px;}
+.btn-secondary:active{background:rgba(82,183,136,0.08);}
+.loc-pill{display:flex;align-items:center;gap:8px;background:rgba(82,183,136,0.1);border-radius:10px;padding:9px 12px;font-size:0.8rem;color:var(--moss);font-weight:500;border:1px solid rgba(82,183,136,0.2);margin-bottom:6px;}
+
+/* MAP */
+#map .scroll-content{padding:0;}
+.map-wrap{flex:1;position:relative;overflow:hidden;background:#c8e6c9;}
+.map-svg-el{position:absolute;inset:0;width:100%;height:100%;}
+#map-pins{position:absolute;inset:0;pointer-events:none;}
+.map-pin{position:absolute;cursor:pointer;transform:translate(-50%,-100%);transition:transform 0.15s;pointer-events:all;}
+.map-pin:active{transform:translate(-50%,-100%) scale(1.2);}
+.mp-inner{display:flex;flex-direction:column;align-items:center;}
+.mp-bubble{background:#fff;border-radius:8px;padding:2px 7px;font-size:0.58rem;font-weight:700;color:var(--forest);white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.15);margin-bottom:1px;max-width:80px;overflow:hidden;text-overflow:ellipsis;}
+.mp-emoji{font-size:1.5rem;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.2));}
+.mp-dot{width:5px;height:5px;background:#333;border-radius:50%;margin-top:1px;}
+.pin-popup{position:absolute;background:#fff;border-radius:16px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,0.22);width:185px;z-index:20;display:none;border:1px solid rgba(82,183,136,0.15);}
+.pp-close{position:absolute;top:8px;right:10px;background:none;border:none;font-size:1rem;cursor:pointer;color:#ccc;}
+.pp-emoji{font-size:1.8rem;margin-bottom:5px;}
+.pp-name{font-weight:700;font-size:0.9rem;color:var(--forest);}
+.pp-loc{font-size:0.72rem;color:#999;margin-top:2px;}
+.pp-tags{margin:6px 0;}
+.pp-btn{width:100%;padding:8px;background:var(--leaf);border:none;border-radius:8px;color:#fff;font-size:0.78rem;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600;}
+.map-overlay{position:absolute;top:12px;right:12px;display:flex;flex-direction:column;gap:8px;z-index:10;}
+.map-fab{width:40px;height:40px;border-radius:12px;border:none;background:rgba(255,255,255,0.92);box-shadow:var(--shadow);font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.map-legend{position:absolute;bottom:14px;left:12px;background:rgba(255,255,255,0.92);border-radius:12px;padding:9px 13px;box-shadow:var(--shadow);font-size:0.72rem;color:var(--forest);}
+.legend-row{display:flex;align-items:center;gap:6px;margin-bottom:3px;}
+.map-pill{position:absolute;top:12px;left:12px;background:rgba(255,255,255,0.92);border-radius:20px;padding:6px 14px;font-size:0.75rem;font-weight:600;color:var(--moss);box-shadow:var(--shadow);}
+
+/* SPECIES */
+#species .scroll-content{background:var(--cream);padding:16px;}
+.search-bar{background:var(--card);border:1.5px solid rgba(45,106,79,0.15);border-radius:50px;padding:10px 18px;display:flex;align-items:center;gap:10px;margin-bottom:14px;box-shadow:var(--shadow);}
+.search-bar input{flex:1;border:none;background:none;outline:none;font-family:'DM Sans',sans-serif;font-size:0.9rem;color:var(--forest);}
+.filter-chips{display:flex;gap:7px;overflow-x:auto;padding-bottom:6px;margin-bottom:14px;}
+.filter-chips::-webkit-scrollbar{display:none;}
+.chip{padding:6px 15px;border-radius:20px;white-space:nowrap;font-size:0.75rem;font-weight:600;cursor:pointer;border:1.5px solid var(--leaf);color:var(--moss);background:transparent;transition:all 0.15s;font-family:'DM Sans',sans-serif;}
+.chip.active{background:var(--leaf);color:#fff;}
+.species-card{background:var(--card);border-radius:16px;padding:13px;display:flex;gap:13px;margin-bottom:11px;box-shadow:var(--shadow);cursor:pointer;transition:transform 0.15s;border:1px solid rgba(82,183,136,0.08);}
+.species-card:active{transform:scale(0.98);}
+.sp-emoji{font-size:2.2rem;width:50px;height:50px;background:rgba(82,183,136,0.1);border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.sp-info{flex:1;min-width:0;}
+.sp-name{font-weight:700;font-size:0.92rem;color:var(--forest);}
+.sp-sci{font-style:italic;font-size:0.72rem;color:#888;margin-top:1px;}
+.sp-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px;}
+.sp-desc{font-size:0.76rem;color:#777;margin-top:5px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+
+/* ALERTS */
+#alerts .scroll-content{background:var(--cream);padding:16px;}
+.alert-card{background:var(--card);border-radius:16px;padding:15px;margin-bottom:12px;box-shadow:var(--shadow);cursor:pointer;transition:transform 0.15s;}
+.alert-card.danger{border-left:4px solid var(--danger);}
+.alert-card.warn{border-left:4px solid var(--warn);}
+.alert-card.info{border-left:4px solid var(--leaf);}
+.alert-card:active{transform:scale(0.98);}
+.ac-top{display:flex;justify-content:space-between;align-items:center;}
+.ac-badge{padding:3px 10px;border-radius:20px;font-size:0.68rem;font-weight:700;}
+.bd{background:rgba(230,57,70,0.12);color:var(--danger);}
+.bw{background:rgba(244,162,97,0.15);color:#b85a00;}
+.bi{background:rgba(82,183,136,0.15);color:var(--moss);}
+.ac-title{font-weight:700;font-size:0.9rem;color:var(--forest);margin-top:8px;}
+.ac-body{font-size:0.78rem;color:#666;margin-top:5px;line-height:1.55;}
+.ac-footer{display:flex;justify-content:space-between;margin-top:9px;font-size:0.7rem;color:#bbb;}
+
+/* DETAIL */
+#detail .scroll-content{background:var(--cream);padding:0;}
+.detail-hero{background:linear-gradient(160deg,var(--moss),var(--forest));padding:28px 20px 22px;text-align:center;}
+.detail-emoji{font-size:5rem;display:block;margin-bottom:10px;}
+.detail-name{font-family:'Playfair Display',serif;color:var(--cream);font-size:1.65rem;line-height:1.1;}
+.detail-sci{font-style:italic;color:var(--lime);font-size:0.85rem;margin-top:5px;}
+.detail-tags{display:flex;gap:7px;justify-content:center;flex-wrap:wrap;margin-top:12px;}
+.detail-body{padding:18px;}
+.d-section{background:var(--card);border-radius:16px;padding:15px;margin-bottom:13px;box-shadow:var(--shadow);}
+.d-section h3{font-family:'Playfair Display',serif;font-size:0.95rem;color:var(--moss);margin-bottom:8px;}
+.d-section p{font-size:0.83rem;color:#555;line-height:1.6;}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.ii-lbl{font-size:0.68rem;color:#aaa;text-transform:uppercase;letter-spacing:0.07em;}
+.ii-val{font-size:0.85rem;font-weight:600;color:var(--forest);margin-top:2px;}
+.sm-item{background:rgba(82,183,136,0.07);border-radius:10px;padding:10px 12px;margin-bottom:8px;border:1px solid rgba(82,183,136,0.12);}
+.sm-top{display:flex;justify-content:space-between;}
+.sm-loc{font-size:0.8rem;font-weight:600;color:var(--forest);}
+.sm-time{font-size:0.7rem;color:#aaa;}
+.sm-note{font-size:0.76rem;color:#777;margin-top:4px;line-height:1.4;}
+.sm-img{width:100%;border-radius:8px;margin-top:8px;max-height:120px;object-fit:cover;}
+
+/* EMPTY */
+.empty-state{text-align:center;padding:50px 20px;color:#bbb;}
+.empty-state .es-icon{font-size:3rem;margin-bottom:12px;}
+.empty-state p{font-size:0.88rem;line-height:1.6;}
+
+/* TOAST */
+.toast{position:fixed;bottom:76px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--forest);color:#fff;padding:11px 22px;border-radius:30px;font-size:0.82rem;opacity:0;pointer-events:none;transition:all 0.3s;z-index:200;box-shadow:0 4px 20px rgba(0,0,0,0.3);max-width:90vw;text-align:center;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.toast.success{background:var(--moss);}
+.toast.error{background:var(--danger);}
+.toast.warn{background:var(--bark);}
+</style>
+</head>
+<body>
+
+<!-- SPLASH -->
+<div id="splash" class="screen active">
+  <div class="splash-bg"><span>🌿</span><span>🌸</span><span>🦜</span><span>🌳</span><span>🦎</span><span>🐦</span></div>
+  <div class="splash-inner">
+    <div class="splash-lens">🔬</div>
+    <div class="splash-title">NatureLens</div>
+    <div class="splash-tagline">Local Bio-Tracker</div>
+    <div class="splash-desc">Help map Janiuay's biodiversity. Photograph, identify, and protect local wildlife — together.</div>
+    <button class="btn-start" onclick="initApp()">Start Exploring 🌿</button>
+  </div>
+  <div class="splash-sdg">🌱 SDG 15 · Life on Land · WVSU Janiuay</div>
+</div>
+
+<!-- HOME -->
+<div id="home" class="screen">
+  <div class="topbar">
+    <span style="font-size:1.3rem">🔬</span>
+    <span class="topbar-title">NatureLens</span>
+    <button class="topbar-right" onclick="showScreen('mysightings')">My Sightings →</button>
+  </div>
+  <div class="scroll-content" style="background:var(--cream);padding:16px;">
+    <div class="home-hero">
+      <h2>Good day, Explorer! 👋</h2>
+      <p>Help map Janiuay's biodiversity. Upload a photo and let AI identify it.</p>
+      <button class="location-pill" onclick="getLocation()">📍 <span id="hero-loc">Tap for location</span></button>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-num" id="stat-total">0</div><div class="stat-lbl">Sightings</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-sp">0</div><div class="stat-lbl">Species</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-al">0</div><div class="stat-lbl">Alerts</div></div>
+    </div>
+    <div class="section-title">Quick Actions</div>
+    <div class="quick-actions">
+      <div class="action-card" onclick="showScreen('upload')"><span class="ac-icon">📸</span><span class="ac-title">Upload Sighting</span><span class="ac-sub">AI species identification</span></div>
+      <div class="action-card" onclick="showScreen('map')"><span class="ac-icon">🗺️</span><span class="ac-title">Nature Map</span><span class="ac-sub">All community sightings</span></div>
+      <div class="action-card" onclick="showScreen('species')"><span class="ac-icon">📖</span><span class="ac-title">Species DB</span><span class="ac-sub">Browse local flora & fauna</span></div>
+      <div class="action-card" onclick="showScreen('alerts')"><span class="ac-icon">🔔</span><span class="ac-title">Alerts</span><span class="ac-sub">Invasive & endangered</span></div>
+    </div>
+    <div class="section-title">Recent Sightings</div>
+    <div id="recent-list"><div class="empty-state"><div class="es-icon">🌱</div><p>No sightings yet.<br>Be the first to upload one!</p></div></div>
+  </div>
+  <div class="nav-bar">
+    <button class="nav-btn active" onclick="showScreen('home')"><span class="icon">🏡</span>Home</button>
+    <button class="nav-btn" onclick="showScreen('upload')"><span class="icon">📸</span>Upload</button>
+    <button class="nav-btn" onclick="showScreen('map')"><span class="icon">🗺️</span>Map</button>
+    <button class="nav-btn" onclick="showScreen('species')"><span class="icon">📖</span>Species</button>
+    <button class="nav-btn" onclick="showScreen('alerts')"><span class="icon">🔔</span>Alerts</button>
+  </div>
+</div>
+
+<!-- UPLOAD -->
+<div id="upload" class="screen">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showScreen('home')">←</button>
+    <span class="topbar-title">Upload Sighting</span>
+  </div>
+  <div class="scroll-content" style="background:var(--cream);">
+    <div style="padding:16px;">
+      <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+        <div class="uz-icon">📷</div>
+        <div class="uz-title">Tap to take or upload a photo</div>
+        <div class="uz-sub">AI will identify the species automatically</div>
+      </div>
+      <input type="file" id="file-input" accept="image/*" capture="environment" onchange="handlePhoto(event)">
+      <img id="preview-img" alt="Preview">
+      <div class="spinner-wrap" id="id-spinner"><div class="spinner"></div><span class="spinner-label">🤖 AI is analyzing the image…</span></div>
+      <div class="ai-card" id="ai-card">
+        <div class="ar-header">
+          <div class="ar-emoji-box" id="ar-emoji">🌿</div>
+          <div><div class="ar-name" id="ar-name">—</div><div class="ar-sci" id="ar-sci"></div></div>
+        </div>
+        <div class="ar-conf-row"><div class="conf-bar-wrap"><div class="conf-bar" id="conf-bar" style="width:0%"></div></div><span class="conf-pct" id="conf-pct">0%</span></div>
+        <div class="ar-desc" id="ar-desc"></div>
+        <div class="ar-tags" id="ar-tags"></div>
+        <div class="ai-warning" id="ai-warning"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Species Name</label><input type="text" class="form-input" id="inp-species" placeholder="e.g. Talisay Tree"></div>
+      <div class="form-group"><label class="form-label">Category</label><select class="form-select" id="inp-cat"><option value="">Select category</option><option>Plant</option><option>Bird</option><option>Mammal</option><option>Reptile</option><option>Insect</option><option>Fish</option><option>Amphibian</option><option>Other</option></select></div>
+      <div class="form-group"><label class="form-label">Conservation Status</label><select class="form-select" id="inp-status"><option value="">Select status</option><option value="native">Native</option><option value="invasive">Invasive</option><option value="endangered">Endangered</option><option value="common">Common</option><option value="unknown">Unknown</option></select></div>
+      <div class="form-group">
+        <label class="form-label">Location</label>
+        <div class="loc-pill" id="loc-pill" style="display:none">📍 <span id="loc-text">—</span></div>
+        <input type="text" class="form-input" id="inp-loc" placeholder="e.g. Brgy. Cari, Janiuay, Iloilo">
+      </div>
+      <div class="form-group"><label class="form-label">Notes</label><textarea class="form-textarea" id="inp-notes" placeholder="Describe behavior, habitat, anything unusual…"></textarea></div>
+      <button class="btn-primary" onclick="submitSighting()" style="margin-bottom:8px">📍 Add to Nature Map</button>
+      <button class="btn-secondary" onclick="clearUploadForm()">Clear</button>
+      <div style="height:28px;"></div>
+    </div>
+  </div>
+  <div class="nav-bar">
+    <button class="nav-btn" onclick="showScreen('home')"><span class="icon">🏡</span>Home</button>
+    <button class="nav-btn active" onclick="showScreen('upload')"><span class="icon">📸</span>Upload</button>
+    <button class="nav-btn" onclick="showScreen('map')"><span class="icon">🗺️</span>Map</button>
+    <button class="nav-btn" onclick="showScreen('species')"><span class="icon">📖</span>Species</button>
+    <button class="nav-btn" onclick="showScreen('alerts')"><span class="icon">🔔</span>Alerts</button>
+  </div>
+</div>
+
+<!-- MAP -->
+<div id="map" class="screen">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showScreen('home')">←</button>
+    <span class="topbar-title">Nature Map</span>
+    <span class="topbar-right" id="map-count-lbl">0 pins</span>
+  </div>
+  <div class="map-wrap" id="map-wrap">
+    <svg class="map-svg-el" viewBox="0 0 400 600" xmlns="http://www.w3.org/2000/svg">
+      <defs><linearGradient id="mg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#b2dfdb" stop-opacity="0.6"/><stop offset="100%" stop-color="#dcedc8" stop-opacity="0.5"/></linearGradient></defs>
+      <rect width="400" height="600" fill="#c8e6c9"/><rect width="400" height="600" fill="url(#mg)"/>
+      <path d="M0,280 Q80,260 200,280 Q320,300 400,280" stroke="#fff" stroke-width="7" fill="none" opacity="0.55"/>
+      <path d="M200,0 Q215,120 200,280 Q185,420 200,600" stroke="#fff" stroke-width="6" fill="none" opacity="0.5"/>
+      <path d="M0,420 Q100,400 250,430 Q340,445 400,430" stroke="#fff" stroke-width="5" fill="none" opacity="0.4"/>
+      <path d="M80,0 Q100,80 70,200 Q50,300 90,600" stroke="#fff" stroke-width="4" fill="none" opacity="0.3"/>
+      <path d="M60,0 Q40,100 70,220 Q100,320 75,440 Q55,520 80,600" stroke="#90caf9" stroke-width="11" fill="none" opacity="0.55"/>
+      <path d="M62,0 Q42,100 72,220 Q102,320 77,440 Q57,520 82,600" stroke="#bbdefb" stroke-width="5" fill="none" opacity="0.3"/>
+      <ellipse cx="310" cy="110" rx="65" ry="50" fill="#81c784" opacity="0.35"/>
+      <ellipse cx="130" cy="450" rx="55" ry="40" fill="#66bb6a" opacity="0.3"/>
+      <ellipse cx="340" cy="450" rx="45" ry="35" fill="#a5d6a7" opacity="0.35"/>
+      <text x="200" y="22" text-anchor="middle" fill="#388e3c" font-size="11" font-weight="bold" opacity="0.65" font-family="sans-serif">Janiuay, Iloilo</text>
+      <text x="72" y="195" fill="#1565c0" font-size="9" opacity="0.55" font-family="sans-serif" transform="rotate(-75,72,195)">Jalaur River</text>
+      <text x="295" y="98" fill="#2e7d32" font-size="9" opacity="0.55" font-family="sans-serif">Forest</text>
+      <text x="105" y="442" fill="#2e7d32" font-size="9" opacity="0.55" font-family="sans-serif">Brgy. Cari</text>
+      <text x="315" y="442" fill="#2e7d32" font-size="9" opacity="0.55" font-family="sans-serif">Brgy. Aglobong</text>
+      <text x="160" y="260" fill="#555" font-size="9" opacity="0.4" font-family="sans-serif">Poblacion</text>
+    </svg>
+    <div id="map-pins"></div>
+    <div class="pin-popup" id="pin-popup">
+      <button class="pp-close" onclick="closePopup()">✕</button>
+      <div class="pp-emoji" id="pp-emoji"></div>
+      <div class="pp-name" id="pp-name"></div>
+      <div class="pp-loc" id="pp-loc"></div>
+      <div class="pp-tags" id="pp-tags"></div>
+      <button class="pp-btn" onclick="viewFromMap()">View Details →</button>
+    </div>
+    <div class="map-pill" id="map-pill">0 sightings</div>
+    <div class="map-overlay">
+      <button class="map-fab" onclick="showScreen('upload')" title="Add">➕</button>
+    </div>
+    <div class="map-legend">
+      <div class="legend-row">🌿 Native</div>
+      <div class="legend-row">⚠️ Invasive</div>
+      <div class="legend-row">🚨 Endangered</div>
+      <div class="legend-row">📍 Common</div>
+    </div>
+  </div>
+  <div class="nav-bar">
+    <button class="nav-btn" onclick="showScreen('home')"><span class="icon">🏡</span>Home</button>
+    <button class="nav-btn" onclick="showScreen('upload')"><span class="icon">📸</span>Upload</button>
+    <button class="nav-btn active" onclick="showScreen('map')"><span class="icon">🗺️</span>Map</button>
+    <button class="nav-btn" onclick="showScreen('species')"><span class="icon">📖</span>Species</button>
+    <button class="nav-btn" onclick="showScreen('alerts')"><span class="icon">🔔</span>Alerts</button>
+  </div>
+</div>
+
+<!-- SPECIES DB -->
+<div id="species" class="screen">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showScreen('home')">←</button>
+    <span class="topbar-title">Species Database</span>
+    <span class="topbar-right" id="sp-count-lbl">0 species</span>
+  </div>
+  <div class="scroll-content" style="background:var(--cream);padding:16px;">
+    <div class="search-bar"><span>🔍</span><input type="text" placeholder="Search species…" id="sp-search" oninput="renderSpeciesDB()"></div>
+    <div class="filter-chips">
+      <button class="chip active" onclick="setChip(this,'All')">All</button>
+      <button class="chip" onclick="setChip(this,'Plant')">🌿 Plant</button>
+      <button class="chip" onclick="setChip(this,'Bird')">🐦 Bird</button>
+      <button class="chip" onclick="setChip(this,'Mammal')">🦝 Mammal</button>
+      <button class="chip" onclick="setChip(this,'Reptile')">🦎 Reptile</button>
+      <button class="chip" onclick="setChip(this,'Insect')">🐛 Insect</button>
+      <button class="chip" onclick="setChip(this,'Fish')">🐟 Fish</button>
+    </div>
+    <div id="species-list"></div>
+  </div>
+  <div class="nav-bar">
+    <button class="nav-btn" onclick="showScreen('home')"><span class="icon">🏡</span>Home</button>
+    <button class="nav-btn" onclick="showScreen('upload')"><span class="icon">📸</span>Upload</button>
+    <button class="nav-btn" onclick="showScreen('map')"><span class="icon">🗺️</span>Map</button>
+    <button class="nav-btn active" onclick="showScreen('species')"><span class="icon">📖</span>Species</button>
+    <button class="nav-btn" onclick="showScreen('alerts')"><span class="icon">🔔</span>Alerts</button>
+  </div>
+</div>
+
+<!-- ALERTS -->
+<div id="alerts" class="screen">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showScreen('home')">←</button>
+    <span class="topbar-title">Environmental Alerts</span>
+    <span class="topbar-right" id="al-count-lbl"></span>
+  </div>
+  <div class="scroll-content" style="background:var(--cream);padding:16px;"><div id="alerts-list"></div></div>
+  <div class="nav-bar">
+    <button class="nav-btn" onclick="showScreen('home')"><span class="icon">🏡</span>Home</button>
+    <button class="nav-btn" onclick="showScreen('upload')"><span class="icon">📸</span>Upload</button>
+    <button class="nav-btn" onclick="showScreen('map')"><span class="icon">🗺️</span>Map</button>
+    <button class="nav-btn" onclick="showScreen('species')"><span class="icon">📖</span>Species</button>
+    <button class="nav-btn active" onclick="showScreen('alerts')"><span class="icon">🔔</span>Alerts</button>
+  </div>
+</div>
+
+<!-- DETAIL -->
+<div id="detail" class="screen">
+  <div class="topbar">
+    <button class="topbar-back" id="det-back">←</button>
+    <span class="topbar-title" id="det-title">Species</span>
+  </div>
+  <div class="scroll-content" id="det-content" style="padding:0;background:var(--cream);"></div>
+</div>
+
+<!-- MY SIGHTINGS -->
+<div id="mysightings" class="screen">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showScreen('home')">←</button>
+    <span class="topbar-title">My Sightings</span>
+    <button class="topbar-right" style="color:var(--danger);" onclick="confirmClear()">Clear All</button>
+  </div>
+  <div class="scroll-content" style="background:var(--cream);padding:16px;"><div id="my-list"></div></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── STATE ──
+const SK = 'nlens_v3', AK = 'nlens_alerts_v3';
+let sightings = [], alerts = [], spFilter = 'All', activePopup = null;
+let userLat = null, userLng = null, imgBase64 = null, fromScreen = 'home';
+
+// ── STORAGE ──
+function save(){ try{ localStorage.setItem(SK,JSON.stringify(sightings)); localStorage.setItem(AK,JSON.stringify(alerts)); }catch(e){} }
+function load(){ try{ const s=localStorage.getItem(SK); if(s) sightings=JSON.parse(s); const a=localStorage.getItem(AK); if(a) alerts=JSON.parse(a); }catch(e){ sightings=[]; alerts=[]; } }
+
+// ── STATIC SPECIES DB ──
+const SDB=[
+  {name:'Philippine Cockatoo',sci:'Cacatua haematuropygia',cat:'Bird',status:'endangered',emoji:'🦜',desc:'Critically endangered parrot endemic to Philippines, known for white plumage and red tail.',habitat:'Tropical forests & mangroves',diet:'Fruits, seeds',size:'30–34 cm',info:'Known as "Katala". Threatened by habitat loss & illegal trapping. Report sightings to DENR.'},
+  {name:'Water Hyacinth',sci:'Eichhornia crassipes',cat:'Plant',status:'invasive',emoji:'🌸',desc:'Invasive aquatic plant forming dense mats, blocking sunlight and oxygen in waterways.',habitat:'Freshwater rivers, ponds',diet:'N/A',size:'Up to 1m',info:'Spreads rapidly & outcompetes native plants. Harms fish populations. Report to DENR.'},
+  {name:'Talisay Tree',sci:'Terminalia catappa',cat:'Plant',status:'native',emoji:'🌳',desc:'Large native coastal tree prized for shade and edible seeds. Vital for wildlife.',habitat:'Coastal & lowland areas',diet:'N/A',size:'Up to 25m',info:'Important native tree providing food and shelter for birds and insects.'},
+  {name:'Water Monitor Lizard',sci:'Varanus salvator',cat:'Reptile',status:'native',emoji:'🦎',desc:'Largest Philippine lizard, vital ecosystem scavenger and predator.',habitat:'Near water, forests',diet:'Fish, frogs, small mammals',size:'Up to 2m',info:'Called "bayawak". Protected under Philippine wildlife laws. Do not harm.'},
+  {name:'Golden Orb Spider',sci:'Nephila pilipes',cat:'Insect',status:'native',emoji:'🕷️',desc:'Large spider with golden silk webs, crucial for natural insect control.',habitat:'Forests, gardens, farms',diet:'Flying insects',size:'Female up to 5cm',info:'Harmless to humans. Silk is one of strongest natural materials known.'},
+  {name:'Maya Bird',sci:'Lonchura atricapilla',cat:'Bird',status:'common',emoji:'🐦',desc:'National bird of the Philippines, very common in Janiuay ricefields and gardens.',habitat:'Grasslands, ricefields',diet:'Seeds, grains',size:'11–12 cm',info:'Beloved symbol of Philippine wildlife. Thrives in agricultural areas.'},
+  {name:'Bamboo',sci:'Bambusa vulgaris',cat:'Plant',status:'native',emoji:'🎋',desc:'Common bamboo vital for construction, crafts and wildlife habitat.',habitat:'Riverbanks, forests',diet:'N/A',size:'Up to 20m',info:'Key for watershed protection and carbon sequestration.'},
+  {name:'Philippine Flying Lemur',sci:'Cynocephalus volans',cat:'Mammal',status:'endangered',emoji:'🦇',desc:'Rare gliding mammal "Kagwang" found in Philippine forests.',habitat:'Tropical forests',diet:'Leaves, flowers',size:'35–40 cm',info:'Critical for forest seed dispersal. Facing severe habitat loss.'},
+  {name:'Tilapia',sci:'Oreochromis niloticus',cat:'Fish',status:'common',emoji:'🐟',desc:'Widespread freshwater fish important for local food security.',habitat:'Rivers, fishponds',diet:'Algae, plankton',size:'30–45 cm',info:'Important food source. Wild populations help control algae.'},
+  {name:'Philippine Toad',sci:'Duttaphrynus melanostictus',cat:'Amphibian',status:'common',emoji:'🐸',desc:'Common toad found in gardens. Excellent natural pest controller.',habitat:'Gardens, fields, near water',diet:'Insects, worms',size:'6–15 cm',info:'Important pest control agent. Do not harm them.'},
+];
+
+// ── NAVIGATION ──
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  const idx={home:0,upload:1,map:2,species:3,alerts:4};
+  if(idx[id]!==undefined) document.querySelectorAll('.nav-btn')[idx[id]].classList.add('active');
+  const renders={home:renderHome,map:renderMap,species:renderSpeciesDB,alerts:renderAlerts,mysightings:renderMySightings};
+  if(renders[id]) renders[id]();
+}
+
+function initApp(){ load(); getLocation(); showScreen('home'); }
+
+// ── GEOLOCATION ──
+function getLocation(){
+  document.getElementById('hero-loc').textContent='Detecting…';
+  if(!navigator.geolocation){ document.getElementById('hero-loc').textContent='Janiuay, Iloilo'; return; }
+  navigator.geolocation.getCurrentPosition(pos=>{
+    userLat=pos.coords.latitude; userLng=pos.coords.longitude;
+    document.getElementById('hero-loc').textContent='Janiuay, Iloilo ✓';
+    const pill=document.getElementById('loc-pill');
+    if(pill){ document.getElementById('loc-text').textContent=`GPS ${userLat.toFixed(5)}, ${userLng.toFixed(5)}`; pill.style.display='flex'; }
+    document.getElementById('inp-loc').placeholder=`GPS: ${userLat.toFixed(4)}, ${userLng.toFixed(4)}`;
+  },()=>{ document.getElementById('hero-loc').textContent='Janiuay, Iloilo'; },{timeout:8000});
+}
+
+// ── AI IDENTIFICATION ──
+async function identifyWithAI(base64){
+  const spinner=document.getElementById('id-spinner');
+  const card=document.getElementById('ai-card');
+  spinner.style.display='flex'; card.style.display='none';
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        messages:[{role:'user',content:[
+          {type:'image',source:{type:'base64',media_type:'image/jpeg',data:base64}},
+          {type:'text',text:`You are a Philippines wildlife expert for Janiuay, Iloilo area. Identify the species or organism in this image.
+
+Respond ONLY with a raw JSON object (no markdown, no code blocks). Use exactly these fields:
+{"name":"Common name","scientific_name":"Scientific name","category":"Plant|Bird|Mammal|Reptile|Insect|Fish|Amphibian|Other","status":"native|invasive|endangered|common|unknown","confidence":85,"emoji":"🌿","description":"2-3 sentences about this species in Philippines context","conservation_note":"Brief conservation info for Philippines","is_alert_needed":false,"alert_reason":""}
+
+Set is_alert_needed=true if invasive OR endangered. If image is unclear, provide best guess with low confidence.`}
+        ]}]
+      })
+    });
+    const data=await res.json();
+    const raw=data.content?.find(c=>c.type==='text')?.text||'{}';
+    const clean=raw.replace(/```json|```/g,'').trim();
+    const r=JSON.parse(clean);
+    spinner.style.display='none';
+    showAIResult(r);
+    return r;
+  }catch(err){
+    spinner.style.display='none';
+    showToast('AI identification unavailable. Fill in manually.','error');
+    return null;
+  }
+}
+
+function showAIResult(r){
+  document.getElementById('ar-emoji').textContent=r.emoji||'🌿';
+  document.getElementById('ar-name').textContent=r.name||'Unknown Species';
+  document.getElementById('ar-sci').textContent=r.scientific_name||'';
+  const conf=r.confidence||0;
+  document.getElementById('conf-pct').textContent=conf+'%';
+  setTimeout(()=>{ document.getElementById('conf-bar').style.width=conf+'%'; },100);
+  document.getElementById('ar-desc').textContent=r.description||'';
+  document.getElementById('ar-tags').innerHTML=`<span class="tag ${r.status||'unknown'}">${cap(r.status||'unknown')}</span><span class="tag common">${r.category||'?'}</span>`;
+  const warn=document.getElementById('ai-warning');
+  if(r.is_alert_needed&&r.alert_reason){ warn.style.display='block'; warn.textContent='⚠️ '+r.alert_reason; }
+  else warn.style.display='none';
+  document.getElementById('ai-card').style.display='block';
+  document.getElementById('inp-species').value=r.name||'';
+  document.getElementById('inp-cat').value=r.category||'';
+  document.getElementById('inp-status').value=r.status||'';
+}
+
+// ── PHOTO HANDLING ──
+function handlePhoto(e){
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=async ev=>{
+    const full=ev.target.result;
+    const img=document.getElementById('preview-img'); img.src=full; img.style.display='block';
+    const zone=document.getElementById('upload-zone');
+    zone.querySelector('.uz-icon').textContent='✅';
+    zone.querySelector('.uz-title').textContent='Photo selected — tap to change';
+    zone.classList.add('has-image');
+    imgBase64=full.split(',')[1];
+    await identifyWithAI(imgBase64);
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── SUBMIT ──
+function submitSighting(){
+  const species=document.getElementById('inp-species').value.trim();
+  if(!species){ showToast('Please enter a species name','error'); return; }
+  const cat=document.getElementById('inp-cat').value||'Other';
+  const status=document.getElementById('inp-status').value||'unknown';
+  const loc=document.getElementById('inp-loc').value.trim()||'Janiuay, Iloilo';
+  const notes=document.getElementById('inp-notes').value.trim();
+  const emoji=document.getElementById('ar-emoji').textContent||guessEmoji(species,cat);
+  const sci=document.getElementById('ar-sci').textContent||'';
+  const desc=document.getElementById('ar-desc').textContent||'';
+
+  const s={id:Date.now(),species,cat,status,loc,notes,emoji,sci,desc,
+    lat:userLat,lng:userLng,image:imgBase64?'data:image/jpeg;base64,'+imgBase64:null,
+    timestamp:new Date().toISOString(),reporter:'You'};
+  sightings.unshift(s);
+
+  if(status==='invasive'||status==='endangered'){
+    alerts.unshift({id:Date.now()+1,type:status==='invasive'?'danger':'warn',
+      badge:status==='invasive'?'🚨 Invasive':'⚠️ Endangered',
+      title:(status==='invasive'?'Invasive':'Endangered')+' Species: '+species,
+      body:status==='invasive'
+        ?species+' spotted at '+loc+'. DENR notified. Avoid disturbing the area.'
+        :'Endangered '+species+' spotted at '+loc+'. Environmental groups alerted.',
+      loc,time:'Just now',reporter:'You'});
+  }
+
+  save(); updateStats(); clearUploadForm();
+  showToast('✅ Sighting added to Nature Map!','success');
+  setTimeout(()=>showScreen('map'),1200);
+}
+
+function clearUploadForm(){
+  document.getElementById('file-input').value='';
+  document.getElementById('preview-img').style.display='none';
+  document.getElementById('ai-card').style.display='none';
+  document.getElementById('id-spinner').style.display='none';
+  ['inp-species','inp-cat','inp-status','inp-loc','inp-notes'].forEach(id=>{ document.getElementById(id).value=''; });
+  const zone=document.getElementById('upload-zone');
+  zone.querySelector('.uz-icon').textContent='📷';
+  zone.querySelector('.uz-title').textContent='Tap to take or upload a photo';
+  zone.classList.remove('has-image');
+  imgBase64=null;
+}
+
+// ── HOME ──
+function renderHome(){
+  updateStats();
+  const list=document.getElementById('recent-list');
+  if(!sightings.length){ list.innerHTML='<div class="empty-state"><div class="es-icon">🌱</div><p>No sightings yet.<br>Be the first to upload one!</p></div>'; return; }
+  list.innerHTML=sightings.slice(0,6).map(s=>`
+    <div class="recent-item" onclick="fromScreen='home';showSightingDetail(${s.id})">
+      <div class="ri-emoji">${s.emoji}</div>
+      <div class="ri-info">
+        <div class="ri-name">${s.species}</div>
+        <div class="ri-loc">📍 ${s.loc}</div>
+        <div class="ri-time">${timeAgo(s.timestamp)}</div>
+      </div>
+      <span class="tag ${s.status}">${cap(s.status)}</span>
+    </div>`).join('');
+}
+
+function updateStats(){
+  document.getElementById('stat-total').textContent=sightings.length;
+  document.getElementById('stat-sp').textContent=new Set(sightings.map(s=>s.species.toLowerCase())).size;
+  document.getElementById('stat-al').textContent=alerts.length;
+}
+
+// ── MAP ──
+const PRESETS=[{x:55,y:42},{x:28,y:62},{x:72,y:25},{x:45,y:72},{x:62,y:55},{x:35,y:38},{x:80,y:60},{x:20,y:35},{x:68,y:80},{x:50,y:20}];
+
+function renderMap(){
+  document.getElementById('map-count-lbl').textContent=sightings.length+' pins';
+  document.getElementById('map-pill').textContent=sightings.length+' sightings';
+  const container=document.getElementById('map-pins');
+  container.innerHTML=sightings.map((s,i)=>{
+    const pre=PRESETS[i%PRESETS.length];
+    const x=pre.x+(Math.sin(s.id*0.001)*4), y=pre.y+(Math.cos(s.id*0.001)*4);
+    const shortName=s.species.split(' ').slice(0,2).join(' ');
+    return `<div class="map-pin" style="left:${x}%;top:${y}%;" onclick="openPin(event,${s.id},${x},${y})">
+      <div class="mp-inner"><div class="mp-bubble">${shortName}</div><div class="mp-emoji">${s.emoji}</div><div class="mp-dot"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function openPin(e,id,px,py){
+  e.stopPropagation();
+  const s=sightings.find(x=>x.id===id); if(!s) return;
+  activePopup=s;
+  document.getElementById('pp-emoji').textContent=s.emoji;
+  document.getElementById('pp-name').textContent=s.species;
+  document.getElementById('pp-loc').textContent='📍 '+s.loc;
+  document.getElementById('pp-tags').innerHTML=`<span class="tag ${s.status}">${cap(s.status)}</span><span class="tag common">${s.cat||'?'}</span>`;
+  const popup=document.getElementById('pin-popup');
+  const wrap=document.getElementById('map-wrap');
+  let left=(px/100)*wrap.offsetWidth-92;
+  let top=(py/100)*wrap.offsetHeight-195;
+  left=Math.max(8,Math.min(wrap.offsetWidth-195,left));
+  top=Math.max(55,Math.min(wrap.offsetHeight-175,top));
+  popup.style.left=left+'px'; popup.style.top=top+'px'; popup.style.display='block';
+}
+function closePopup(){ document.getElementById('pin-popup').style.display='none'; activePopup=null; }
+function viewFromMap(){ if(!activePopup) return; closePopup(); fromScreen='map'; showSightingDetail(activePopup.id); }
+document.addEventListener('click',e=>{ const p=document.getElementById('pin-popup'); if(p&&p.style.display==='block'&&!p.contains(e.target)&&!e.target.closest('.map-pin')) closePopup(); });
+
+// ── SPECIES DB ──
+function renderSpeciesDB(){
+  const q=(document.getElementById('sp-search')?.value||'').toLowerCase();
+  const all=buildAllSpecies();
+  const filtered=all.filter(s=>(spFilter==='All'||s.cat===spFilter)&&(s.name.toLowerCase().includes(q)||(s.sci||'').toLowerCase().includes(q)));
+  document.getElementById('sp-count-lbl').textContent=filtered.length+' species';
+  const list=document.getElementById('species-list');
+  if(!filtered.length){ list.innerHTML='<div class="empty-state"><div class="es-icon">🔍</div><p>No species found.</p></div>'; return; }
+  list.innerHTML=filtered.map(s=>`
+    <div class="species-card" onclick="showSpeciesDetail('${encodeURIComponent(s.name)}')">
+      <div class="sp-emoji">${s.emoji}</div>
+      <div class="sp-info">
+        <div class="sp-name">${s.name}</div>
+        <div class="sp-sci">${s.sci||''}</div>
+        <div class="sp-tags"><span class="tag ${s.status}">${cap(s.status)}</span><span class="tag common">${s.cat}</span><span class="tag unknown">👁 ${s.cnt} spotted</span></div>
+        <div class="sp-desc">${s.desc}</div>
+      </div>
+    </div>`).join('');
+}
+
+function buildAllSpecies(){
+  const result=SDB.map(s=>({...s,cnt:sightings.filter(x=>x.species.toLowerCase()===s.name.toLowerCase()).length}));
+  sightings.forEach(s=>{
+    if(!result.find(r=>r.name.toLowerCase()===s.species.toLowerCase())){
+      result.push({name:s.species,sci:s.sci||'',cat:s.cat||'Other',status:s.status||'unknown',
+        emoji:s.emoji||'📍',desc:s.desc||'User-reported sighting.',
+        habitat:'Unknown',diet:'Unknown',size:'Unknown',info:'Community-reported species.',cnt:
+        sightings.filter(x=>x.species.toLowerCase()===s.species.toLowerCase()).length});
+    }
+  });
+  return result;
+}
+
+function setChip(el,val){ document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active')); el.classList.add('active'); spFilter=val; renderSpeciesDB(); }
+
+function showSpeciesDetail(enc){
+  const name=decodeURIComponent(enc);
+  const all=buildAllSpecies();
+  const s=all.find(x=>x.name.toLowerCase()===name.toLowerCase()); if(!s) return;
+  document.getElementById('det-back').onclick=()=>showScreen('species');
+  document.getElementById('det-title').textContent=s.name;
+  const rel=sightings.filter(x=>x.species.toLowerCase()===s.name.toLowerCase());
+  document.getElementById('det-content').innerHTML=`
+    <div class="detail-hero">
+      <span class="detail-emoji">${s.emoji}</span>
+      <div class="detail-name">${s.name}</div>
+      <div class="detail-sci">${s.sci||''}</div>
+      <div class="detail-tags"><span class="tag ${s.status}">${cap(s.status)}</span><span class="tag common">${s.cat}</span><span class="tag unknown">👁 ${s.cnt}</span></div>
+    </div>
+    <div class="detail-body">
+      <div class="d-section"><h3>About</h3><p>${s.desc}</p></div>
+      <div class="d-section"><h3>Quick Info</h3>
+        <div class="info-grid">
+          <div><div class="ii-lbl">Habitat</div><div class="ii-val">${s.habitat||'—'}</div></div>
+          <div><div class="ii-lbl">Diet</div><div class="ii-val">${s.diet||'—'}</div></div>
+          <div><div class="ii-lbl">Size</div><div class="ii-val">${s.size||'—'}</div></div>
+          <div><div class="ii-lbl">Category</div><div class="ii-val">${s.cat}</div></div>
+        </div>
+      </div>
+      <div class="d-section"><h3>Conservation Notes</h3><p>${s.info||'No notes available.'}</p></div>
+      ${rel.length?`<div class="d-section"><h3>Community Sightings (${rel.length})</h3>${rel.map(r=>`
+        <div class="sm-item">
+          <div class="sm-top"><span class="sm-loc">📍 ${r.loc}</span><span class="sm-time">${timeAgo(r.timestamp)}</span></div>
+          ${r.notes?`<div class="sm-note">"${r.notes}"</div>`:''}
+          ${r.image?`<img src="${r.image}" class="sm-img" alt="Sighting photo">`:''}
+        </div>`).join('')}</div>`:''}
+      <button class="btn-primary" style="margin-bottom:24px;" onclick="prefillUpload('${encodeURIComponent(s.name)}','${s.emoji}','${s.cat}','${s.status}')">📸 Report a Sighting</button>
+    </div>`;
+  showScreen('detail');
+}
+
+function prefillUpload(enc,emoji,cat,status){
+  const name=decodeURIComponent(enc);
+  showScreen('upload');
+  document.getElementById('inp-species').value=name;
+  document.getElementById('inp-cat').value=cat;
+  document.getElementById('inp-status').value=status;
+  const card=document.getElementById('ai-card'); card.style.display='block';
+  document.getElementById('ar-emoji').textContent=emoji;
+  document.getElementById('ar-name').textContent=name;
+  document.getElementById('ar-sci').textContent='';
+  document.getElementById('conf-pct').textContent='—';
+  document.getElementById('ar-desc').textContent='Pre-filled from Species Database. Upload a photo to confirm with AI.';
+  document.getElementById('ar-tags').innerHTML=`<span class="tag ${status}">${cap(status)}</span><span class="tag common">${cat}</span>`;
+  document.getElementById('ai-warning').style.display='none';
+}
+
+// ── SIGHTING DETAIL ──
+function showSightingDetail(id){
+  const s=sightings.find(x=>x.id===id); if(!s) return;
+  document.getElementById('det-back').onclick=()=>showScreen(fromScreen);
+  document.getElementById('det-title').textContent=s.species;
+  document.getElementById('det-content').innerHTML=`
+    ${s.image?`<img src="${s.image}" style="width:100%;max-height:220px;object-fit:cover;display:block;">`:''}
+    <div class="detail-hero">
+      <span class="detail-emoji">${s.emoji}</span>
+      <div class="detail-name">${s.species}</div>
+      <div class="detail-sci">${s.sci||''}</div>
+      <div class="detail-tags"><span class="tag ${s.status}">${cap(s.status)}</span><span class="tag common">${s.cat||'?'}</span></div>
+    </div>
+    <div class="detail-body">
+      <div class="d-section"><h3>Sighting Info</h3>
+        <div class="info-grid">
+          <div><div class="ii-lbl">Location</div><div class="ii-val">${s.loc}</div></div>
+          <div><div class="ii-lbl">Date</div><div class="ii-val">${fmtDate(s.timestamp)}</div></div>
+          <div><div class="ii-lbl">Reporter</div><div class="ii-val">${s.reporter||'You'}</div></div>
+          <div><div class="ii-lbl">Category</div><div class="ii-val">${s.cat||'—'}</div></div>
+        </div>
+      </div>
+      ${s.desc?`<div class="d-section"><h3>AI Description</h3><p>${s.desc}</p></div>`:''}
+      ${s.notes?`<div class="d-section"><h3>Notes</h3><p>${s.notes}</p></div>`:''}
+      ${s.lat&&s.lng?`<div class="d-section"><h3>GPS Coordinates</h3><p>${s.lat.toFixed(6)}, ${s.lng.toFixed(6)}</p></div>`:''}
+      <button class="btn-secondary" onclick="deleteSighting(${s.id})" style="color:var(--danger);border-color:var(--danger);margin-bottom:24px;">🗑 Delete This Sighting</button>
+    </div>`;
+  showScreen('detail');
+}
+
+function deleteSighting(id){
+  if(!confirm('Delete this sighting?')) return;
+  sightings=sightings.filter(s=>s.id!==id); save(); updateStats();
+  showToast('Sighting deleted.','warn'); showScreen(fromScreen==='detail'?'home':fromScreen);
+}
+
+// ── ALERTS ──
+function renderAlerts(){
+  document.getElementById('al-count-lbl').textContent=alerts.length+' alerts';
+  const list=document.getElementById('alerts-list');
+  if(!alerts.length){ list.innerHTML='<div class="empty-state"><div class="es-icon">✅</div><p>No alerts yet.<br>Alerts appear automatically when invasive or endangered species are reported.</p></div>'; return; }
+  list.innerHTML=alerts.map(a=>`
+    <div class="alert-card ${a.type}">
+      <div class="ac-top"><span></span><span class="ac-badge ${a.type==='danger'?'bd':'bw'}">${a.badge}</span></div>
+      <div class="ac-title">${a.title}</div>
+      <div class="ac-body">${a.body}</div>
+      <div class="ac-footer"><span>📍 ${a.loc}</span><span>🕐 ${a.time}</span></div>
+      <div style="font-size:0.7rem;color:#ccc;margin-top:3px;">Reported by: ${a.reporter}</div>
+    </div>`).join('');
+}
+
+// ── MY SIGHTINGS ──
+function renderMySightings(){
+  const list=document.getElementById('my-list');
+  if(!sightings.length){ list.innerHTML='<div class="empty-state"><div class="es-icon">📭</div><p>No sightings yet.<br>Upload one to get started!</p></div>'; return; }
+  list.innerHTML=sightings.map(s=>`
+    <div class="recent-item" onclick="fromScreen='mysightings';showSightingDetail(${s.id})">
+      <div class="ri-emoji">${s.emoji}</div>
+      <div class="ri-info">
+        <div class="ri-name">${s.species}</div>
+        <div class="ri-loc">📍 ${s.loc}</div>
+        <div class="ri-time">${timeAgo(s.timestamp)}</div>
+      </div>
+      <span class="tag ${s.status}">${cap(s.status)}</span>
+    </div>`).join('');
+}
+
+function confirmClear(){
+  if(confirm('Delete ALL sightings and alerts? This cannot be undone.'))
+  { sightings=[]; alerts=[]; save(); updateStats(); renderMySightings(); showToast('Cleared.','warn'); }
+}
+
+// ── UTILS ──
+function cap(s){ return s?s[0].toUpperCase()+s.slice(1):''; }
+function timeAgo(ts){
+  const d=(Date.now()-new Date(ts).getTime())/1000;
+  if(d<60) return 'Just now';
+  if(d<3600) return Math.floor(d/60)+'m ago';
+  if(d<86400) return Math.floor(d/3600)+'h ago';
+  return Math.floor(d/86400)+'d ago';
+}
+function fmtDate(ts){ return new Date(ts).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'}); }
+function guessEmoji(name,cat){
+  const n=name.toLowerCase();
+  if(n.includes('bird')||n.includes('maya')||n.includes('cockatoo')||cat==='Bird') return '🐦';
+  if(n.includes('tree')||n.includes('plant')||n.includes('bamboo')||cat==='Plant') return '🌿';
+  if(cat==='Fish') return '🐟'; if(cat==='Reptile') return '🦎';
+  if(cat==='Insect') return '🦋'; if(cat==='Mammal') return '🦝';
+  if(cat==='Amphibian') return '🐸'; return '📍';
+}
+let toastTmr;
+function showToast(msg,type=''){
+  const t=document.getElementById('toast'); t.textContent=msg;
+  t.className='toast'+(type?' '+type:''); t.classList.add('show');
+  clearTimeout(toastTmr); toastTmr=setTimeout(()=>t.classList.remove('show'),3000);
+}
+</script>
+</body>
+</html>
